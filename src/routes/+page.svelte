@@ -16,6 +16,8 @@
 	let newQueryName = '';
 	let showSaveDialog = false;
 	let savedQueriesDropdown: HTMLElement | null = null;
+	let tables: string[] = [];
+	let loadingTables = false;
 
 	onMount(() => {
 		// Load saved credentials from localStorage
@@ -156,6 +158,62 @@
 		}
 	}
 
+	async function fetchTables() {
+		if (!accountId || !apiKey) {
+			error = 'Please provide Account ID and API Key';
+			return;
+		}
+
+		// Save credentials
+		saveCredentials();
+
+		loadingTables = true;
+		error = '';
+		tables = [];
+
+		try {
+			const response = await fetch('/api/analytics', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({
+					accountId,
+					apiKey,
+					sql: 'SHOW TABLES'
+				})
+			});
+
+			const data = await response.json();
+			console.log('SHOW TABLES response:', data);
+
+			if (!response.ok || !data.success) {
+				error = data.errors?.[0]?.message || 'An error occurred while fetching tables';
+			} else {
+				// Handle the specific response format for SHOW TABLES
+				if (data.result && data.result.data && Array.isArray(data.result.data)) {
+					tables = data.result.data.map((item: any) => item.dataset).filter(Boolean);
+				}
+
+				console.log('Processed tables:', tables);
+
+				if (tables.length === 0) {
+					error = 'No tables found. This could be because your account has no data yet.';
+				}
+			}
+		} catch (err) {
+			console.error('Error fetching tables:', err);
+			error = err instanceof Error ? err.message : 'An unknown error occurred';
+		} finally {
+			loadingTables = false;
+		}
+	}
+
+	function selectTable(tableName: string) {
+		const query = `SELECT * FROM ${tableName} LIMIT 10`;
+		loadQuery(query);
+	}
+
 	function toggleDropdown() {
 		if (savedQueriesDropdown) {
 			savedQueriesDropdown.classList.toggle('hidden');
@@ -189,6 +247,7 @@
 		content="A playground for exploring Cloudflare Analytics Engine SQL API"
 	/>
 </svelte:head>
+
 <div class="container mx-auto max-w-4xl p-4">
 	<div class="mb-6 flex items-center justify-between">
 		<h1 class="text-3xl font-bold">Cloudflare Analytics Engine Playground</h1>
@@ -267,10 +326,54 @@
 		</div>
 	</div>
 
+	<div class="mb-4">
+		<button
+			on:click={fetchTables}
+			disabled={loadingTables || !accountId || !apiKey}
+			class="rounded bg-gray-600 px-4 py-2 font-medium text-white hover:bg-gray-700 disabled:opacity-50"
+		>
+			{loadingTables ? 'Loading Tables...' : 'Show Available Tables'}
+		</button>
+	</div>
+
+	{#if tables.length > 0}
+		<div class="mb-6">
+			<h2 class="mb-2 text-lg font-semibold">Available Tables:</h2>
+			<div class="flex flex-wrap gap-2">
+				{#each tables as table}
+					<button
+						on:click={() => selectTable(table)}
+						class="rounded bg-blue-100 px-3 py-1 text-sm text-blue-800 hover:bg-blue-200"
+					>
+						{table}
+					</button>
+				{/each}
+			</div>
+		</div>
+	{:else if loadingTables}
+		<div class="mb-6">
+			<p class="text-gray-600">Loading tables...</p>
+		</div>
+	{:else if error && error.includes('No tables found')}
+		<div class="mb-6 rounded-lg bg-yellow-50 p-4 text-yellow-800">
+			<p>
+				No tables found. This could be because you haven't published any data to Analytics Engine
+				yet.
+			</p>
+		</div>
+	{/if}
+
 	<div class="mb-6">
 		<div class="mb-1 flex items-center justify-between">
 			<label for="sqlEditor" class="block text-sm font-medium">SQL Query</label>
 			<div class="flex space-x-2">
+				<button
+					on:click={() => loadQuery("SELECT 'Hello Cloudflare Analytics Engine' AS message")}
+					class="rounded bg-gray-200 px-2 py-1 text-sm hover:bg-gray-300"
+					title="Run a simple test query"
+				>
+					Sample Query
+				</button>
 				<button
 					on:click={() => (showSaveDialog = true)}
 					class="rounded bg-gray-200 px-2 py-1 text-sm hover:bg-gray-300"
@@ -379,7 +482,7 @@
 </div>
 
 {#if showSaveDialog}
-	<div class="bg-opacity-50 fixed inset-0 z-50 flex items-center justify-center bg-black">
+	<div class="bg-opacity-30 fixed inset-0 z-50 flex items-center justify-center bg-black">
 		<div class="w-full max-w-md rounded-lg bg-white p-6 shadow-lg">
 			<h2 class="mb-4 text-xl font-semibold">Save Query</h2>
 			<div class="mb-4">
