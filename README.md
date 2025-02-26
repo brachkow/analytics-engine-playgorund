@@ -1,38 +1,68 @@
-# sv
+# Cloudflare Analytics Engine Playground
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+A simple web application that allows you to interact with Cloudflare's Analytics Engine SQL API.
 
-## Creating a project
+## Features
 
-If you're seeing this, you've probably already done this step. Congrats!
+- Input your Cloudflare Account ID and API Key
+- Write SQL queries with syntax highlighting
+- Execute queries against the Cloudflare Analytics Engine
+- View formatted JSON results
+- Error handling for failed queries
 
-```bash
-# create a new project in the current directory
-npx sv create
+## Getting Started
 
-# create a new project in my-app
-npx sv create my-app
-```
+### Prerequisites
 
-## Developing
+- Node.js (v16 or higher)
+- pnpm
 
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+### Installation
 
-```bash
-npm run dev
-
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
-```
-
-## Building
-
-To create a production version of your app:
+1. Clone the repository
+2. Install dependencies:
 
 ```bash
-npm run build
+pnpm install
 ```
 
-You can preview the production build with `npm run preview`.
+3. Start the development server:
 
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+```bash
+pnpm dev
+```
+
+4. Open your browser and navigate to `http://localhost:5173`
+
+## Usage
+
+1. Enter your Cloudflare Account ID and API Key in the respective fields
+2. Write your SQL query in the editor
+3. Click "Execute Query" to send the request to Cloudflare's Analytics Engine
+4. View the results in the formatted JSON output area
+
+## API Documentation
+
+For more information about Cloudflare's Analytics Engine SQL API, visit:
+[Cloudflare Analytics Engine SQL API Documentation](https://developers.cloudflare.com/analytics/analytics-engine/sql-api/)
+
+## Example Queries
+
+```sql
+-- Get HTTP requests from the last 24 hours
+SELECT * FROM http_requests WHERE datetime > NOW() - INTERVAL '1' DAY LIMIT 10
+
+-- Count requests by status code
+SELECT status, COUNT(*) as count FROM http_requests GROUP BY status ORDER BY count DESC
+
+-- Get top client countries
+SELECT clientCountryName, COUNT(*) as count 
+FROM http_requests 
+GROUP BY clientCountryName 
+ORDER BY count DESC 
+LIMIT 10
+```
+
+## License
+
+MIT
