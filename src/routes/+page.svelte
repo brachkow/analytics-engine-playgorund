@@ -290,7 +290,7 @@
 	}
 
 	function selectTable(tableName: string) {
-		const query = `SELECT * FROM ${tableName} LIMIT 10`;
+		const query = `SELECT * FROM '${tableName}' LIMIT 10`;
 		loadQuery(query);
 	}
 
