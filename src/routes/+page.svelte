@@ -389,18 +389,8 @@
 				</div>
 			</div>
 
-			<div class="mb-4">
-				<button
-					onclick={fetchTables}
-					disabled={loadingTables || !accountId || !apiKey}
-					class="rounded bg-gray-600 px-4 py-2 font-medium text-white hover:bg-gray-700 disabled:opacity-50"
-				>
-					{loadingTables ? 'Loading Tables...' : 'Show Available Tables'}
-				</button>
-			</div>
-
 			{#if tables.length > 0}
-				<div class="mb-6">
+				<div class="mb-4">
 					<h2 class="mb-2 text-lg font-semibold">Available Tables:</h2>
 					<div class="flex flex-wrap gap-2">
 						{#each tables as table}
@@ -425,6 +415,16 @@
 					</p>
 				</div>
 			{/if}
+
+			<div class="mb-4">
+				<button
+					onclick={fetchTables}
+					disabled={loadingTables || !accountId || !apiKey}
+					class="rounded bg-gray-600 px-4 py-2 font-medium text-white hover:bg-gray-700 disabled:opacity-50"
+				>
+					{loadingTables ? 'Loading Tables...' : 'Fetch available tables'}
+				</button>
+			</div>
 
 			<div class="mb-6 flex h-[300px] flex-grow flex-col md:h-auto">
 				<div class="mb-1 flex items-center justify-between">
