@@ -452,13 +452,6 @@
 					<label for="sqlEditor" class="block text-sm font-medium">SQL Query</label>
 					<div class="flex space-x-2">
 						<button
-							onclick={() => loadQuery("SELECT 'Hello Cloudflare Analytics Engine' AS message")}
-							class="rounded bg-gray-200 px-2 py-1 text-sm hover:bg-gray-300"
-							title="Run a simple test query"
-						>
-							Sample Query
-						</button>
-						<button
 							onclick={() => (showSaveDialog = true)}
 							class="rounded bg-gray-200 px-2 py-1 text-sm hover:bg-gray-300"
 						>
