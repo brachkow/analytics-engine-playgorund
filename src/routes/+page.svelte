@@ -375,14 +375,6 @@
 		</div>
 	</div>
 
-	<div class="mb-4 rounded-lg bg-blue-50 p-4 text-blue-800">
-		<p>
-			<strong>Note:</strong> This app runs entirely in your browser. Your Cloudflare credentials are
-			stored only in your local browser's storage and are never sent to any server other than Cloudflare's
-			API.
-		</p>
-	</div>
-
 	<!-- Two-pane layout -->
 	<div class="flex flex-col gap-6 md:h-[calc(100vh-220px)] md:flex-row">
 		<!-- Left pane: Controls and SQL editor -->
@@ -408,6 +400,13 @@
 						class="w-full rounded border p-2"
 						placeholder="Enter your Cloudflare API Key"
 					/>
+				</div>
+				<div class="col-span-1 text-sm md:col-span-2">
+					<p>
+						This app runs entirely in your browser. Your Cloudflare credentials are stored only in
+						your browser's local storage and are never sent to any server other than Cloudflare's
+						API.
+					</p>
 				</div>
 			</div>
 
