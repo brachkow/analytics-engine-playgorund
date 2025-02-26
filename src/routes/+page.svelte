@@ -1,29 +1,33 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { EditorView, basicSetup } from 'codemirror';
-	import { sql } from '@codemirror/lang-sql';
-	import { json } from '@codemirror/lang-json';
-	import { oneDark } from '@codemirror/theme-one-dark';
-	import { EditorState } from '@codemirror/state';
+	import Header from '$lib/components/Header.svelte';
+	import CredentialsInput from '$lib/components/CredentialsInput.svelte';
+	import TableList from '$lib/components/TableList.svelte';
+	import SqlEditor from '$lib/components/SqlEditor.svelte';
+	import ResultViewer from '$lib/components/ResultViewer.svelte';
+	import SavedQueriesDropdown from '$lib/components/SavedQueriesDropdown.svelte';
+	import SaveQueryDialog from '$lib/components/SaveQueryDialog.svelte';
+	import * as analyticsService from '$lib/services/analyticsService';
 
+	// State variables
 	let accountId = $state('');
 	let apiKey = $state('');
-	let sqlQuery = 'SELECT * FROM http_requests LIMIT 10';
+	let sqlQuery = $state('SELECT * FROM http_requests LIMIT 10');
 	let result = $state('');
 	let error = $state('');
 	let loading = $state(false);
-	let editorElement: HTMLElement;
-	let resultEditorElement: HTMLElement;
-	let editorView: EditorView;
-	let resultEditorView: EditorView;
 	let savedQueries: { name: string; query: string }[] = $state([]);
 	let newQueryName = $state('');
 	let showSaveDialog = $state(false);
-	let savedQueriesDropdown: HTMLElement | null = $state(null);
+	let savedQueriesVisible = $state(false);
 	let tables: string[] = $state([]);
 	let loadingTables = $state(false);
-	let credentialsComplete = false;
+	let credentialsComplete = $state(false);
 
+	// SQL Editor reference
+	let sqlEditorApi = $state<{ updateEditor: (query: string) => void } | null>(null);
+
+	// Check if credentials are complete
 	$effect(() => {
 		const hasCredentials = accountId && apiKey;
 		if (hasCredentials && !credentialsComplete) {
@@ -34,81 +38,17 @@
 		}
 	});
 
-	// Update result editor when result changes
-	$effect(() => {
-		if (resultEditorView && result) {
-			resultEditorView.dispatch({
-				changes: { from: 0, to: resultEditorView.state.doc.length, insert: result }
-			});
-		}
-	});
-
 	onMount(() => {
 		// Load saved credentials from localStorage
-		const savedAccountId = localStorage.getItem('cf_account_id');
-		const savedApiKey = localStorage.getItem('cf_api_key');
-
-		if (savedAccountId) accountId = savedAccountId;
-		if (savedApiKey) apiKey = savedApiKey;
+		const credentials = analyticsService.loadCredentials();
+		accountId = credentials.accountId;
+		apiKey = credentials.apiKey;
 
 		// Load saved queries from localStorage
-		const savedQueriesJson = localStorage.getItem('cf_saved_queries');
-		if (savedQueriesJson) {
-			try {
-				savedQueries = JSON.parse(savedQueriesJson);
-			} catch (e) {
-				console.error('Failed to parse saved queries:', e);
-			}
-		}
-
-		// Initialize SQL CodeMirror
-		try {
-			editorView = new EditorView({
-				doc: sqlQuery,
-				extensions: [
-					basicSetup,
-					sql(),
-					oneDark,
-					EditorView.updateListener.of((update) => {
-						if (update.docChanged) {
-							sqlQuery = update.state.doc.toString();
-						}
-					})
-				],
-				parent: editorElement
-			});
-		} catch (e) {
-			console.error('Error initializing CodeMirror:', e);
-			error = `Error initializing editor: ${e instanceof Error ? e.message : String(e)}`;
-		}
-
-		// Initialize Result CodeMirror (readonly)
-		try {
-			resultEditorView = new EditorView({
-				doc: result || '// Results will appear here after executing a query',
-				extensions: [basicSetup, json(), oneDark, EditorState.readOnly.of(true)],
-				parent: resultEditorElement
-			});
-		} catch (e) {
-			console.error('Error initializing result editor:', e);
-			error = `Error initializing result editor: ${e instanceof Error ? e.message : String(e)}`;
-		}
-
-		return () => {
-			if (editorView) {
-				editorView.destroy();
-			}
-			if (resultEditorView) {
-				resultEditorView.destroy();
-			}
-		};
+		savedQueries = analyticsService.loadSavedQueries();
 	});
 
-	function saveCredentials() {
-		localStorage.setItem('cf_account_id', accountId);
-		localStorage.setItem('cf_api_key', apiKey);
-	}
-
+	// Functions for handling saved queries
 	function saveQuery() {
 		if (!newQueryName || !sqlQuery) return;
 
@@ -120,25 +60,24 @@
 			savedQueries = [...savedQueries, { name: newQueryName, query: sqlQuery }];
 		}
 
-		localStorage.setItem('cf_saved_queries', JSON.stringify(savedQueries));
+		analyticsService.saveQueries(savedQueries);
 		newQueryName = '';
 		showSaveDialog = false;
 	}
 
 	function loadQuery(query: string) {
 		sqlQuery = query;
-		if (editorView) {
-			const transaction = editorView.dispatch({
-				changes: { from: 0, to: editorView.state.doc.length, insert: query }
-			});
+		if (sqlEditorApi) {
+			sqlEditorApi.updateEditor(query);
 		}
 	}
 
 	function deleteQuery(index: number) {
 		savedQueries = savedQueries.filter((_, i) => i !== index);
-		localStorage.setItem('cf_saved_queries', JSON.stringify(savedQueries));
+		analyticsService.saveQueries(savedQueries);
 	}
 
+	// Functions for query execution
 	async function executeQuery() {
 		if (!accountId || !apiKey || !sqlQuery) {
 			error = 'Please provide Account ID, API Key, and SQL query';
@@ -146,98 +85,28 @@
 		}
 
 		// Save credentials
-		saveCredentials();
+		analyticsService.saveCredentials({ accountId, apiKey });
 
 		loading = true;
 		error = '';
 		result = '';
 
-		// Clear the result editor
-		if (resultEditorView) {
-			resultEditorView.dispatch({
-				changes: { from: 0, to: resultEditorView.state.doc.length, insert: '// Executing query...' }
-			});
-		}
-
 		try {
-			const response = await fetch('/api/analytics', {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json'
-				},
-				body: JSON.stringify({
-					accountId,
-					apiKey,
-					sql: sqlQuery
-				})
-			});
+			const queryResult = await analyticsService.executeQuery({ accountId, apiKey }, sqlQuery);
 
-			const data = await response.json();
-
-			if (!response.ok || !data.success) {
-				error = data.errors?.[0]?.message || 'An error occurred while executing the query';
-				// Update result editor with error
-				if (resultEditorView) {
-					resultEditorView.dispatch({
-						changes: {
-							from: 0,
-							to: resultEditorView.state.doc.length,
-							insert: `// Error: ${error}`
-						}
-					});
-				}
+			if (!queryResult.success) {
+				error = queryResult.error || 'An error occurred while executing the query';
 			} else {
-				// Format the result nicely
-				try {
-					// If the result is already a string, try to parse it as JSON for pretty formatting
-					if (typeof data.result === 'string') {
-						try {
-							const parsedResult = JSON.parse(data.result);
-							result = JSON.stringify(parsedResult, null, 2);
-						} catch {
-							// If it's not valid JSON, just use the string as is
-							result = data.result;
-						}
-					} else {
-						// Otherwise, stringify the object with pretty formatting
-						result = JSON.stringify(data.result, null, 2);
-					}
-
-					// Directly update the result editor
-					if (resultEditorView) {
-						resultEditorView.dispatch({
-							changes: { from: 0, to: resultEditorView.state.doc.length, insert: result }
-						});
-					}
-				} catch (err) {
-					console.error('Error formatting result:', err);
-					result = String(data.result);
-
-					// Update with unformatted result
-					if (resultEditorView) {
-						resultEditorView.dispatch({
-							changes: { from: 0, to: resultEditorView.state.doc.length, insert: result }
-						});
-					}
-				}
+				result = analyticsService.formatResult(queryResult.result);
 			}
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'An unknown error occurred';
-			// Update result editor with error
-			if (resultEditorView) {
-				resultEditorView.dispatch({
-					changes: {
-						from: 0,
-						to: resultEditorView.state.doc.length,
-						insert: `// Error: ${error}`
-					}
-				});
-			}
 		} finally {
 			loading = false;
 		}
 	}
 
+	// Functions for table fetching
 	async function fetchTables() {
 		if (!accountId || !apiKey) {
 			error = 'Please provide Account ID and API Key';
@@ -245,37 +114,26 @@
 		}
 
 		// Save credentials
-		saveCredentials();
+		analyticsService.saveCredentials({ accountId, apiKey });
 
 		loadingTables = true;
 		error = '';
 		tables = [];
 
 		try {
-			const response = await fetch('/api/analytics', {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json'
-				},
-				body: JSON.stringify({
-					accountId,
-					apiKey,
-					sql: 'SHOW TABLES'
-				})
-			});
+			const queryResult = await analyticsService.executeQuery({ accountId, apiKey }, 'SHOW TABLES');
 
-			const data = await response.json();
-			console.log('SHOW TABLES response:', data);
-
-			if (!response.ok || !data.success) {
-				error = data.errors?.[0]?.message || 'An error occurred while fetching tables';
+			if (!queryResult.success) {
+				error = queryResult.error || 'An error occurred while fetching tables';
 			} else {
 				// Handle the specific response format for SHOW TABLES
-				if (data.result && data.result.data && Array.isArray(data.result.data)) {
-					tables = data.result.data.map((item: any) => item.dataset).filter(Boolean);
+				if (
+					queryResult.result &&
+					queryResult.result.data &&
+					Array.isArray(queryResult.result.data)
+				) {
+					tables = queryResult.result.data.map((item: any) => item.dataset).filter(Boolean);
 				}
-
-				console.log('Processed tables:', tables);
 
 				if (tables.length === 0) {
 					error = 'No tables found. This could be because your account has no data yet.';
@@ -294,286 +152,98 @@
 		loadQuery(query);
 	}
 
+	// Functions for dropdown handling
 	function toggleDropdown() {
-		if (savedQueriesDropdown) {
-			savedQueriesDropdown.classList.toggle('hidden');
-		}
+		savedQueriesVisible = !savedQueriesVisible;
 	}
 
-	function hideDropdown() {
-		if (savedQueriesDropdown) {
-			savedQueriesDropdown.classList.add('hidden');
-		}
+	function setShowSaveDialog(show: boolean) {
+		showSaveDialog = show;
+	}
+
+	function handleAccountIdChange(id: string) {
+		accountId = id;
+	}
+
+	function handleApiKeyChange(key: string) {
+		apiKey = key;
+	}
+
+	function handleSqlQueryChange(query: string) {
+		sqlQuery = query;
+	}
+
+	function handleQueryNameChange(name: string) {
+		newQueryName = name;
+	}
+
+	function handleDropdownVisibilityChange(visible: boolean) {
+		savedQueriesVisible = visible;
+	}
+
+	function handleEditorReady(editor: { updateEditor: (query: string) => void }) {
+		sqlEditorApi = editor;
 	}
 </script>
 
 <div class="container mx-auto max-w-full p-4">
-	<div class="mb-6 flex items-center justify-between">
-		<h1 class="text-3xl font-bold">Cloudflare Analytics Engine Playground</h1>
-		<div class="flex items-center space-x-4">
-			<a
-				href="https://github.com/brachkow/analytics-engine-playground"
-				target="_blank"
-				rel="noopener noreferrer"
-				class="flex items-center text-gray-600 hover:text-gray-800"
-			>
-				<svg
-					class="h-6 w-6"
-					fill="currentColor"
-					viewBox="0 0 24 24"
-					xmlns="http://www.w3.org/2000/svg"
-				>
-					<path
-						d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"
-					/>
-				</svg>
-				<span class="ml-1">GitHub</span>
-			</a>
-			<a
-				href="https://developers.cloudflare.com/analytics/analytics-engine/sql-api/"
-				target="_blank"
-				rel="noopener noreferrer"
-				class="flex items-center text-blue-600 hover:text-blue-800"
-			>
-				<span>Documentation</span>
-				<svg
-					class="ml-1 h-4 w-4"
-					fill="none"
-					stroke="currentColor"
-					viewBox="0 0 24 24"
-					xmlns="http://www.w3.org/2000/svg"
-				>
-					<path
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						stroke-width="2"
-						d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-					></path>
-				</svg>
-			</a>
-		</div>
-	</div>
+	<Header />
 
 	<!-- Two-pane layout -->
 	<div class="flex flex-col gap-6 md:h-[calc(100vh-220px)] md:flex-row">
 		<!-- Left pane: Controls and SQL editor -->
 		<div class="flex w-full flex-col md:w-1/2">
-			<div class="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2">
-				<div>
-					<label for="accountId" class="mb-1 block text-sm font-medium">Cloudflare Account ID</label
-					>
-					<input
-						id="accountId"
-						type="text"
-						bind:value={accountId}
-						class="w-full rounded border p-2"
-						placeholder="Enter your Cloudflare Account ID"
-					/>
-				</div>
-				<div>
-					<label for="apiKey" class="mb-1 block text-sm font-medium">API Key</label>
-					<input
-						id="apiKey"
-						type="password"
-						bind:value={apiKey}
-						class="w-full rounded border p-2"
-						placeholder="Enter your Cloudflare API Key"
-					/>
-				</div>
-				<div class="col-span-1 text-sm md:col-span-2">
-					<p>
-						This app runs entirely in your browser. Your Cloudflare credentials are stored only in
-						your browser's local storage and are never sent to any server other than Cloudflare's
-						API.
-					</p>
-				</div>
+			<CredentialsInput
+				{accountId}
+				{apiKey}
+				onAccountIdChange={handleAccountIdChange}
+				onApiKeyChange={handleApiKeyChange}
+			/>
+
+			<TableList
+				{tables}
+				{loadingTables}
+				{error}
+				{selectTable}
+				{fetchTables}
+				hasCredentials={!!accountId && !!apiKey}
+			/>
+
+			<SqlEditor
+				{sqlQuery}
+				onSqlQueryChange={handleSqlQueryChange}
+				onEditorReady={handleEditorReady}
+				showSaveDialog={setShowSaveDialog}
+				hasSavedQueries={savedQueries.length > 0}
+				toggleSavedQueriesDropdown={toggleDropdown}
+				{executeQuery}
+				{loading}
+				{error}
+			/>
+
+			<div class="relative">
+				<SavedQueriesDropdown
+					{savedQueries}
+					{loadQuery}
+					{deleteQuery}
+					isVisible={savedQueriesVisible}
+					onVisibilityChange={handleDropdownVisibilityChange}
+				/>
 			</div>
-
-			{#if tables.length > 0}
-				<div class="mb-4">
-					<h2 class="mb-2 text-lg font-semibold">Available Tables:</h2>
-					<div class="flex flex-wrap gap-2">
-						{#each tables as table}
-							<button
-								onclick={() => selectTable(table)}
-								class="rounded bg-blue-100 px-3 py-1 text-sm text-blue-800 hover:bg-blue-200"
-							>
-								{table}
-							</button>
-						{/each}
-					</div>
-				</div>
-			{:else if loadingTables}
-				<div class="mb-6">
-					<p class="text-gray-600">Loading tables...</p>
-				</div>
-			{:else if error && error.includes('No tables found')}
-				<div class="mb-6 rounded-lg bg-yellow-50 p-4 text-yellow-800">
-					<p>
-						No tables found. This could be because you haven't published any data to Analytics
-						Engine yet.
-					</p>
-				</div>
-			{/if}
-
-			<div class="mb-4">
-				<button
-					onclick={fetchTables}
-					disabled={loadingTables || !accountId || !apiKey}
-					class="rounded bg-gray-600 px-4 py-2 font-medium text-white hover:bg-gray-700 disabled:opacity-50"
-				>
-					{loadingTables ? 'Loading Tables...' : 'Fetch available tables'}
-				</button>
-			</div>
-
-			<div class="mb-6 flex h-[300px] flex-grow flex-col md:h-auto">
-				<div class="mb-1 flex items-center justify-between">
-					<label for="sqlEditor" class="block text-sm font-medium">SQL Query</label>
-					<div class="flex space-x-2">
-						<button
-							onclick={() => (showSaveDialog = true)}
-							class="rounded bg-gray-200 px-2 py-1 text-sm hover:bg-gray-300"
-						>
-							Save Query
-						</button>
-						{#if savedQueries.length > 0}
-							<div class="relative inline-block text-left">
-								<button
-									type="button"
-									class="inline-flex items-center rounded bg-gray-200 px-2 py-1 text-sm hover:bg-gray-300"
-									onclick={toggleDropdown}
-								>
-									Load Query
-									<svg
-										class="ml-1 h-4 w-4"
-										fill="none"
-										stroke="currentColor"
-										viewBox="0 0 24 24"
-										xmlns="http://www.w3.org/2000/svg"
-									>
-										<path
-											stroke-linecap="round"
-											stroke-linejoin="round"
-											stroke-width="2"
-											d="M19 9l-7 7-7-7"
-										></path>
-									</svg>
-								</button>
-								<div
-									id="saved-queries-dropdown"
-									bind:this={savedQueriesDropdown}
-									class="ring-opacity-5 absolute right-0 z-10 mt-2 hidden w-56 rounded-md bg-white shadow-lg ring-1 ring-black"
-								>
-									<div class="py-1" role="menu" aria-orientation="vertical">
-										{#each savedQueries as query, i}
-											<div
-												class="flex items-center justify-between px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-											>
-												<button
-													class="flex-grow text-left"
-													onclick={() => {
-														loadQuery(query.query);
-														hideDropdown();
-													}}
-												>
-													{query.name}
-												</button>
-												<button
-													class="text-red-500 hover:text-red-700"
-													onclick={() => {
-														deleteQuery(i);
-														hideDropdown();
-													}}
-													aria-label={`Delete query ${query.name}`}
-												>
-													<svg
-														class="h-4 w-4"
-														fill="none"
-														stroke="currentColor"
-														viewBox="0 0 24 24"
-														xmlns="http://www.w3.org/2000/svg"
-													>
-														<path
-															stroke-linecap="round"
-															stroke-linejoin="round"
-															stroke-width="2"
-															d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-														></path>
-													</svg>
-												</button>
-											</div>
-										{/each}
-									</div>
-								</div>
-							</div>
-						{/if}
-					</div>
-				</div>
-				<div id="sqlEditor" bind:this={editorElement} class="flex-grow rounded border"></div>
-			</div>
-
-			<div class="mb-6">
-				<button
-					onclick={executeQuery}
-					disabled={loading}
-					class="rounded bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-				>
-					{loading ? 'Executing...' : 'Execute Query'}
-				</button>
-			</div>
-
-			{#if error}
-				<div class="mb-6 rounded border border-red-400 bg-red-100 p-4 text-red-700">
-					<p class="font-medium">Error:</p>
-					<p>{error}</p>
-				</div>
-			{/if}
 		</div>
 
 		<!-- Right pane: Results -->
-		<div class="flex h-[300px] w-full flex-col md:h-auto md:w-1/2">
-			<div class="mb-2 flex items-center justify-between">
-				<h2 class="text-xl font-semibold">Result:</h2>
-				{#if loading}
-					<div class="text-sm text-gray-600">Executing query...</div>
-				{/if}
-			</div>
-			<div id="resultEditor" bind:this={resultEditorElement} class="flex-grow rounded border"></div>
-		</div>
+		<ResultViewer {result} {loading} />
 	</div>
 </div>
 
-{#if showSaveDialog}
-	<div class="bg-opacity-30 fixed inset-0 z-50 flex items-center justify-center bg-black">
-		<div class="w-full max-w-md rounded-lg bg-white p-6 shadow-lg">
-			<h2 class="mb-4 text-xl font-semibold">Save Query</h2>
-			<div class="mb-4">
-				<label for="queryName" class="mb-1 block text-sm font-medium">Query Name</label>
-				<input
-					id="queryName"
-					type="text"
-					bind:value={newQueryName}
-					class="w-full rounded border p-2"
-					placeholder="Enter a name for your query"
-				/>
-			</div>
-			<div class="flex justify-end space-x-2">
-				<button
-					onclick={() => (showSaveDialog = false)}
-					class="rounded border px-4 py-2 hover:bg-gray-100"
-				>
-					Cancel
-				</button>
-				<button
-					onclick={saveQuery}
-					class="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
-				>
-					Save
-				</button>
-			</div>
-		</div>
-	</div>
-{/if}
+<SaveQueryDialog
+	{showSaveDialog}
+	{newQueryName}
+	onQueryNameChange={handleQueryNameChange}
+	{saveQuery}
+	closeDialog={() => setShowSaveDialog(false)}
+/>
 
 <style>
 	/* CodeMirror styling */
