@@ -169,6 +169,26 @@
 	}
 </script>
 
+<svelte:head>
+	<title>Cloudflare Analytics Engine Playground</title>
+	<meta
+		name="description"
+		content="A playground for exploring Cloudflare Analytics Engine SQL API"
+	/>
+	<meta name="keywords" content="cloudflare, analytics, sql, api, playground" />
+	<meta property="og:title" content="Cloudflare Analytics Engine Playground" />
+	<meta
+		property="og:description"
+		content="A playground for exploring Cloudflare Analytics Engine SQL API"
+	/>
+	<meta property="og:type" content="website" />
+	<meta name="twitter:card" content="summary" />
+	<meta name="twitter:title" content="Cloudflare Analytics Engine Playground" />
+	<meta
+		name="twitter:description"
+		content="A playground for exploring Cloudflare Analytics Engine SQL API"
+	/>
+</svelte:head>
 <div class="container mx-auto max-w-4xl p-4">
 	<div class="mb-6 flex items-center justify-between">
 		<h1 class="text-3xl font-bold">Cloudflare Analytics Engine Playground</h1>
