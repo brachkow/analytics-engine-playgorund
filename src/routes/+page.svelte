@@ -17,27 +17,6 @@
 	let showSaveDialog = false;
 	let savedQueriesDropdown: HTMLElement | null = null;
 
-	const exampleQueries = [
-		{
-			name: 'HTTP Requests (Last 24h)',
-			query: "SELECT * FROM http_requests WHERE datetime > NOW() - INTERVAL '1' DAY LIMIT 10"
-		},
-		{
-			name: 'Status Code Distribution',
-			query:
-				'SELECT status, COUNT(*) as count FROM http_requests GROUP BY status ORDER BY count DESC'
-		},
-		{
-			name: 'Top Client Countries',
-			query:
-				'SELECT clientCountryName, COUNT(*) as count FROM http_requests GROUP BY clientCountryName ORDER BY count DESC LIMIT 10'
-		},
-		{
-			name: 'Average Response Time',
-			query: 'SELECT AVG(edgeResponseTime) as avg_response_time FROM http_requests'
-		}
-	];
-
 	onMount(() => {
 		// Load saved credentials from localStorage
 		const savedAccountId = localStorage.getItem('cf_account_id');
@@ -324,20 +303,6 @@
 			</div>
 		</div>
 		<div id="sqlEditor" bind:this={editorElement} class="h-64 rounded border"></div>
-	</div>
-
-	<div class="mb-6">
-		<h2 class="mb-2 text-lg font-semibold">Example Queries</h2>
-		<div class="grid grid-cols-1 gap-2 md:grid-cols-2">
-			{#each exampleQueries as example}
-				<button
-					on:click={() => loadQuery(example.query)}
-					class="rounded border p-2 text-left hover:bg-gray-100"
-				>
-					{example.name}
-				</button>
-			{/each}
-		</div>
 	</div>
 
 	<div class="mb-6">
