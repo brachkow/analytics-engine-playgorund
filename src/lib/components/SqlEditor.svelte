@@ -66,7 +66,7 @@
 </script>
 
 <div class="flex flex-col">
-	<div class="mb-4 h-64 w-full overflow-hidden rounded border" bind:this={editorContainer} />
+	<div class="mb-4 h-64 w-full overflow-hidden rounded border" bind:this={editorContainer}></div>
 
 	{#if props.error}
 		<div class="mb-2 rounded bg-red-100 p-2 text-red-700">
@@ -78,14 +78,14 @@
 		<div class="flex gap-2">
 			<button
 				class="rounded bg-blue-500 px-4 py-2 font-bold text-white hover:bg-blue-700"
-				on:click={() => props.executeQuery()}
+				onclick={() => props.executeQuery()}
 				disabled={props.loading}
 			>
 				{props.loading ? 'Running...' : 'Run Query'}
 			</button>
 			<button
 				class="rounded bg-gray-500 px-4 py-2 font-bold text-white hover:bg-gray-700"
-				on:click={() => props.showSaveDialog(true)}
+				onclick={() => props.showSaveDialog(true)}
 			>
 				Save Query
 			</button>
@@ -93,7 +93,7 @@
 		{#if props.hasSavedQueries}
 			<button
 				class="rounded bg-gray-200 px-3 py-1 text-sm hover:bg-gray-300"
-				on:click={props.toggleSavedQueriesDropdown}
+				onclick={props.toggleSavedQueriesDropdown}
 			>
 				Saved Queries
 			</button>
