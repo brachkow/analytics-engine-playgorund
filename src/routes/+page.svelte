@@ -2,7 +2,9 @@
 	import { onMount } from 'svelte';
 	import { EditorView, basicSetup } from 'codemirror';
 	import { sql } from '@codemirror/lang-sql';
+	import { json } from '@codemirror/lang-json';
 	import { oneDark } from '@codemirror/theme-one-dark';
+	import { EditorState } from '@codemirror/state';
 
 	let accountId = $state('');
 	let apiKey = $state('');
@@ -11,7 +13,9 @@
 	let error = $state('');
 	let loading = $state(false);
 	let editorElement: HTMLElement;
+	let resultEditorElement: HTMLElement;
 	let editorView: EditorView;
+	let resultEditorView: EditorView;
 	let savedQueries: { name: string; query: string }[] = $state([]);
 	let newQueryName = $state('');
 	let showSaveDialog = $state(false);
@@ -27,6 +31,15 @@
 			fetchTables();
 		} else if (!hasCredentials) {
 			credentialsComplete = false;
+		}
+	});
+
+	// Update result editor when result changes
+	$effect(() => {
+		if (resultEditorView && result) {
+			resultEditorView.dispatch({
+				changes: { from: 0, to: resultEditorView.state.doc.length, insert: result }
+			});
 		}
 	});
 
@@ -48,7 +61,7 @@
 			}
 		}
 
-		// Initialize CodeMirror
+		// Initialize SQL CodeMirror
 		try {
 			editorView = new EditorView({
 				doc: sqlQuery,
@@ -69,9 +82,24 @@
 			error = `Error initializing editor: ${e instanceof Error ? e.message : String(e)}`;
 		}
 
+		// Initialize Result CodeMirror (readonly)
+		try {
+			resultEditorView = new EditorView({
+				doc: result || '// Results will appear here after executing a query',
+				extensions: [basicSetup, json(), oneDark, EditorState.readOnly.of(true)],
+				parent: resultEditorElement
+			});
+		} catch (e) {
+			console.error('Error initializing result editor:', e);
+			error = `Error initializing result editor: ${e instanceof Error ? e.message : String(e)}`;
+		}
+
 		return () => {
 			if (editorView) {
 				editorView.destroy();
+			}
+			if (resultEditorView) {
+				resultEditorView.destroy();
 			}
 		};
 	});
@@ -124,6 +152,13 @@
 		error = '';
 		result = '';
 
+		// Clear the result editor
+		if (resultEditorView) {
+			resultEditorView.dispatch({
+				changes: { from: 0, to: resultEditorView.state.doc.length, insert: '// Executing query...' }
+			});
+		}
+
 		try {
 			const response = await fetch('/api/analytics', {
 				method: 'POST',
@@ -141,6 +176,16 @@
 
 			if (!response.ok || !data.success) {
 				error = data.errors?.[0]?.message || 'An error occurred while executing the query';
+				// Update result editor with error
+				if (resultEditorView) {
+					resultEditorView.dispatch({
+						changes: {
+							from: 0,
+							to: resultEditorView.state.doc.length,
+							insert: `// Error: ${error}`
+						}
+					});
+				}
 			} else {
 				// Format the result nicely
 				try {
@@ -157,13 +202,37 @@
 						// Otherwise, stringify the object with pretty formatting
 						result = JSON.stringify(data.result, null, 2);
 					}
+
+					// Directly update the result editor
+					if (resultEditorView) {
+						resultEditorView.dispatch({
+							changes: { from: 0, to: resultEditorView.state.doc.length, insert: result }
+						});
+					}
 				} catch (err) {
 					console.error('Error formatting result:', err);
 					result = String(data.result);
+
+					// Update with unformatted result
+					if (resultEditorView) {
+						resultEditorView.dispatch({
+							changes: { from: 0, to: resultEditorView.state.doc.length, insert: result }
+						});
+					}
 				}
 			}
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'An unknown error occurred';
+			// Update result editor with error
+			if (resultEditorView) {
+				resultEditorView.dispatch({
+					changes: {
+						from: 0,
+						to: resultEditorView.state.doc.length,
+						insert: `// Error: ${error}`
+					}
+				});
+			}
 		} finally {
 			loading = false;
 		}
@@ -259,7 +328,7 @@
 	/>
 </svelte:head>
 
-<div class="container mx-auto max-w-4xl p-4">
+<div class="container mx-auto max-w-full p-4">
 	<div class="mb-6 flex items-center justify-between">
 		<h1 class="text-3xl font-bold">Cloudflare Analytics Engine Playground</h1>
 		<div class="flex items-center space-x-4">
@@ -314,182 +383,193 @@
 		</p>
 	</div>
 
-	<div class="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2">
-		<div>
-			<label for="accountId" class="mb-1 block text-sm font-medium">Cloudflare Account ID</label>
-			<input
-				id="accountId"
-				type="text"
-				bind:value={accountId}
-				class="w-full rounded border p-2"
-				placeholder="Enter your Cloudflare Account ID"
-			/>
-		</div>
-		<div>
-			<label for="apiKey" class="mb-1 block text-sm font-medium">API Key</label>
-			<input
-				id="apiKey"
-				type="password"
-				bind:value={apiKey}
-				class="w-full rounded border p-2"
-				placeholder="Enter your Cloudflare API Key"
-			/>
-		</div>
-	</div>
-
-	<div class="mb-4">
-		<button
-			onclick={fetchTables}
-			disabled={loadingTables || !accountId || !apiKey}
-			class="rounded bg-gray-600 px-4 py-2 font-medium text-white hover:bg-gray-700 disabled:opacity-50"
-		>
-			{loadingTables ? 'Loading Tables...' : 'Show Available Tables'}
-		</button>
-	</div>
-
-	{#if tables.length > 0}
-		<div class="mb-6">
-			<h2 class="mb-2 text-lg font-semibold">Available Tables:</h2>
-			<div class="flex flex-wrap gap-2">
-				{#each tables as table}
-					<button
-						onclick={() => selectTable(table)}
-						class="rounded bg-blue-100 px-3 py-1 text-sm text-blue-800 hover:bg-blue-200"
+	<!-- Two-pane layout -->
+	<div class="flex h-[calc(100vh-220px)] flex-col gap-4 md:flex-row">
+		<!-- Left pane: Controls and SQL editor -->
+		<div class="flex w-full flex-col overflow-auto md:w-1/2">
+			<div class="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2">
+				<div>
+					<label for="accountId" class="mb-1 block text-sm font-medium">Cloudflare Account ID</label
 					>
-						{table}
-					</button>
-				{/each}
+					<input
+						id="accountId"
+						type="text"
+						bind:value={accountId}
+						class="w-full rounded border p-2"
+						placeholder="Enter your Cloudflare Account ID"
+					/>
+				</div>
+				<div>
+					<label for="apiKey" class="mb-1 block text-sm font-medium">API Key</label>
+					<input
+						id="apiKey"
+						type="password"
+						bind:value={apiKey}
+						class="w-full rounded border p-2"
+						placeholder="Enter your Cloudflare API Key"
+					/>
+				</div>
 			</div>
-		</div>
-	{:else if loadingTables}
-		<div class="mb-6">
-			<p class="text-gray-600">Loading tables...</p>
-		</div>
-	{:else if error && error.includes('No tables found')}
-		<div class="mb-6 rounded-lg bg-yellow-50 p-4 text-yellow-800">
-			<p>
-				No tables found. This could be because you haven't published any data to Analytics Engine
-				yet.
-			</p>
-		</div>
-	{/if}
 
-	<div class="mb-6">
-		<div class="mb-1 flex items-center justify-between">
-			<label for="sqlEditor" class="block text-sm font-medium">SQL Query</label>
-			<div class="flex space-x-2">
+			<div class="mb-4">
 				<button
-					onclick={() => loadQuery("SELECT 'Hello Cloudflare Analytics Engine' AS message")}
-					class="rounded bg-gray-200 px-2 py-1 text-sm hover:bg-gray-300"
-					title="Run a simple test query"
+					onclick={fetchTables}
+					disabled={loadingTables || !accountId || !apiKey}
+					class="rounded bg-gray-600 px-4 py-2 font-medium text-white hover:bg-gray-700 disabled:opacity-50"
 				>
-					Sample Query
+					{loadingTables ? 'Loading Tables...' : 'Show Available Tables'}
 				</button>
-				<button
-					onclick={() => (showSaveDialog = true)}
-					class="rounded bg-gray-200 px-2 py-1 text-sm hover:bg-gray-300"
-				>
-					Save Query
-				</button>
-				{#if savedQueries.length > 0}
-					<div class="relative inline-block text-left">
-						<button
-							type="button"
-							class="inline-flex items-center rounded bg-gray-200 px-2 py-1 text-sm hover:bg-gray-300"
-							onclick={toggleDropdown}
-						>
-							Load Query
-							<svg
-								class="ml-1 h-4 w-4"
-								fill="none"
-								stroke="currentColor"
-								viewBox="0 0 24 24"
-								xmlns="http://www.w3.org/2000/svg"
+			</div>
+
+			{#if tables.length > 0}
+				<div class="mb-6">
+					<h2 class="mb-2 text-lg font-semibold">Available Tables:</h2>
+					<div class="flex flex-wrap gap-2">
+						{#each tables as table}
+							<button
+								onclick={() => selectTable(table)}
+								class="rounded bg-blue-100 px-3 py-1 text-sm text-blue-800 hover:bg-blue-200"
 							>
-								<path
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									stroke-width="2"
-									d="M19 9l-7 7-7-7"
-								></path>
-							</svg>
-						</button>
-						<div
-							id="saved-queries-dropdown"
-							bind:this={savedQueriesDropdown}
-							class="ring-opacity-5 absolute right-0 z-10 mt-2 hidden w-56 rounded-md bg-white shadow-lg ring-1 ring-black"
-						>
-							<div class="py-1" role="menu" aria-orientation="vertical">
-								{#each savedQueries as query, i}
-									<div
-										class="flex items-center justify-between px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-									>
-										<button
-											class="flex-grow text-left"
-											onclick={() => {
-												loadQuery(query.query);
-												hideDropdown();
-											}}
-										>
-											{query.name}
-										</button>
-										<button
-											class="text-red-500 hover:text-red-700"
-											onclick={() => {
-												deleteQuery(i);
-												hideDropdown();
-											}}
-											aria-label={`Delete query ${query.name}`}
-										>
-											<svg
-												class="h-4 w-4"
-												fill="none"
-												stroke="currentColor"
-												viewBox="0 0 24 24"
-												xmlns="http://www.w3.org/2000/svg"
-											>
-												<path
-													stroke-linecap="round"
-													stroke-linejoin="round"
-													stroke-width="2"
-													d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-												></path>
-											</svg>
-										</button>
-									</div>
-								{/each}
-							</div>
-						</div>
+								{table}
+							</button>
+						{/each}
 					</div>
+				</div>
+			{:else if loadingTables}
+				<div class="mb-6">
+					<p class="text-gray-600">Loading tables...</p>
+				</div>
+			{:else if error && error.includes('No tables found')}
+				<div class="mb-6 rounded-lg bg-yellow-50 p-4 text-yellow-800">
+					<p>
+						No tables found. This could be because you haven't published any data to Analytics
+						Engine yet.
+					</p>
+				</div>
+			{/if}
+
+			<div class="mb-6 flex flex-grow flex-col">
+				<div class="mb-1 flex items-center justify-between">
+					<label for="sqlEditor" class="block text-sm font-medium">SQL Query</label>
+					<div class="flex space-x-2">
+						<button
+							onclick={() => loadQuery("SELECT 'Hello Cloudflare Analytics Engine' AS message")}
+							class="rounded bg-gray-200 px-2 py-1 text-sm hover:bg-gray-300"
+							title="Run a simple test query"
+						>
+							Sample Query
+						</button>
+						<button
+							onclick={() => (showSaveDialog = true)}
+							class="rounded bg-gray-200 px-2 py-1 text-sm hover:bg-gray-300"
+						>
+							Save Query
+						</button>
+						{#if savedQueries.length > 0}
+							<div class="relative inline-block text-left">
+								<button
+									type="button"
+									class="inline-flex items-center rounded bg-gray-200 px-2 py-1 text-sm hover:bg-gray-300"
+									onclick={toggleDropdown}
+								>
+									Load Query
+									<svg
+										class="ml-1 h-4 w-4"
+										fill="none"
+										stroke="currentColor"
+										viewBox="0 0 24 24"
+										xmlns="http://www.w3.org/2000/svg"
+									>
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											stroke-width="2"
+											d="M19 9l-7 7-7-7"
+										></path>
+									</svg>
+								</button>
+								<div
+									id="saved-queries-dropdown"
+									bind:this={savedQueriesDropdown}
+									class="ring-opacity-5 absolute right-0 z-10 mt-2 hidden w-56 rounded-md bg-white shadow-lg ring-1 ring-black"
+								>
+									<div class="py-1" role="menu" aria-orientation="vertical">
+										{#each savedQueries as query, i}
+											<div
+												class="flex items-center justify-between px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+											>
+												<button
+													class="flex-grow text-left"
+													onclick={() => {
+														loadQuery(query.query);
+														hideDropdown();
+													}}
+												>
+													{query.name}
+												</button>
+												<button
+													class="text-red-500 hover:text-red-700"
+													onclick={() => {
+														deleteQuery(i);
+														hideDropdown();
+													}}
+													aria-label={`Delete query ${query.name}`}
+												>
+													<svg
+														class="h-4 w-4"
+														fill="none"
+														stroke="currentColor"
+														viewBox="0 0 24 24"
+														xmlns="http://www.w3.org/2000/svg"
+													>
+														<path
+															stroke-linecap="round"
+															stroke-linejoin="round"
+															stroke-width="2"
+															d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+														></path>
+													</svg>
+												</button>
+											</div>
+										{/each}
+									</div>
+								</div>
+							</div>
+						{/if}
+					</div>
+				</div>
+				<div id="sqlEditor" bind:this={editorElement} class="flex-grow rounded border"></div>
+			</div>
+
+			<div class="mb-6">
+				<button
+					onclick={executeQuery}
+					disabled={loading}
+					class="rounded bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+				>
+					{loading ? 'Executing...' : 'Execute Query'}
+				</button>
+			</div>
+
+			{#if error}
+				<div class="mb-6 rounded border border-red-400 bg-red-100 p-4 text-red-700">
+					<p class="font-medium">Error:</p>
+					<p>{error}</p>
+				</div>
+			{/if}
+		</div>
+
+		<!-- Right pane: Results -->
+		<div class="flex w-full flex-col md:w-1/2">
+			<div class="mb-2 flex items-center justify-between">
+				<h2 class="text-xl font-semibold">Result:</h2>
+				{#if loading}
+					<div class="text-sm text-gray-600">Executing query...</div>
 				{/if}
 			</div>
+			<div id="resultEditor" bind:this={resultEditorElement} class="flex-grow rounded border"></div>
 		</div>
-		<div id="sqlEditor" bind:this={editorElement} class="h-64 rounded border"></div>
 	</div>
-
-	<div class="mb-6">
-		<button
-			onclick={executeQuery}
-			disabled={loading}
-			class="rounded bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-		>
-			{loading ? 'Executing...' : 'Execute Query'}
-		</button>
-	</div>
-
-	{#if error}
-		<div class="mb-6 rounded border border-red-400 bg-red-100 p-4 text-red-700">
-			<p class="font-medium">Error:</p>
-			<p>{error}</p>
-		</div>
-	{/if}
-
-	{#if result}
-		<div class="mb-6">
-			<h2 class="mb-2 text-xl font-semibold">Result:</h2>
-			<pre class="max-h-96 overflow-auto rounded bg-gray-100 p-4 whitespace-pre-wrap">{result}</pre>
-		</div>
-	{/if}
 </div>
 
 {#if showSaveDialog}
