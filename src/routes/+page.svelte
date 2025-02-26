@@ -384,9 +384,9 @@
 	</div>
 
 	<!-- Two-pane layout -->
-	<div class="flex h-[calc(100vh-220px)] flex-col gap-4 md:flex-row">
+	<div class="flex flex-col gap-6 md:h-[calc(100vh-220px)] md:flex-row">
 		<!-- Left pane: Controls and SQL editor -->
-		<div class="flex w-full flex-col overflow-auto md:w-1/2">
+		<div class="flex w-full flex-col md:w-1/2">
 			<div class="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2">
 				<div>
 					<label for="accountId" class="mb-1 block text-sm font-medium">Cloudflare Account ID</label
@@ -448,7 +448,7 @@
 				</div>
 			{/if}
 
-			<div class="mb-6 flex flex-grow flex-col">
+			<div class="mb-6 flex h-[300px] flex-grow flex-col md:h-auto">
 				<div class="mb-1 flex items-center justify-between">
 					<label for="sqlEditor" class="block text-sm font-medium">SQL Query</label>
 					<div class="flex space-x-2">
@@ -560,7 +560,7 @@
 		</div>
 
 		<!-- Right pane: Results -->
-		<div class="flex w-full flex-col md:w-1/2">
+		<div class="flex h-[300px] w-full flex-col md:h-auto md:w-1/2">
 			<div class="mb-2 flex items-center justify-between">
 				<h2 class="text-xl font-semibold">Result:</h2>
 				{#if loading}
@@ -609,9 +609,16 @@
 	:global(.cm-editor) {
 		height: 100%;
 		border-radius: 0.25rem;
+		overflow: hidden;
 	}
 
 	:global(.cm-scroller) {
 		overflow: auto;
+	}
+
+	@media (max-width: 768px) {
+		:global(.cm-editor) {
+			min-height: 200px;
+		}
 	}
 </style>
