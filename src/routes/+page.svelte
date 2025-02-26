@@ -20,6 +20,16 @@
 	let loadingTables = $state(false);
 	let credentialsComplete = false;
 
+	$effect(() => {
+		const hasCredentials = accountId && apiKey;
+		if (hasCredentials && !credentialsComplete) {
+			credentialsComplete = true;
+			fetchTables();
+		} else if (!hasCredentials) {
+			credentialsComplete = false;
+		}
+	});
+
 	onMount(() => {
 		// Load saved credentials from localStorage
 		const savedAccountId = localStorage.getItem('cf_account_id');
