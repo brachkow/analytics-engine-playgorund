@@ -4,20 +4,21 @@
 	import { sql } from '@codemirror/lang-sql';
 	import { oneDark } from '@codemirror/theme-one-dark';
 
-	let accountId = '';
-	let apiKey = '';
+	let accountId = $state('');
+	let apiKey = $state('');
 	let sqlQuery = 'SELECT * FROM http_requests LIMIT 10';
-	let result = '';
-	let error = '';
-	let loading = false;
+	let result = $state('');
+	let error = $state('');
+	let loading = $state(false);
 	let editorElement: HTMLElement;
 	let editorView: EditorView;
-	let savedQueries: { name: string; query: string }[] = [];
-	let newQueryName = '';
-	let showSaveDialog = false;
-	let savedQueriesDropdown: HTMLElement | null = null;
-	let tables: string[] = [];
-	let loadingTables = false;
+	let savedQueries: { name: string; query: string }[] = $state([]);
+	let newQueryName = $state('');
+	let showSaveDialog = $state(false);
+	let savedQueriesDropdown: HTMLElement | null = $state(null);
+	let tables: string[] = $state([]);
+	let loadingTables = $state(false);
+	let credentialsComplete = false;
 
 	onMount(() => {
 		// Load saved credentials from localStorage
@@ -328,7 +329,7 @@
 
 	<div class="mb-4">
 		<button
-			on:click={fetchTables}
+			onclick={fetchTables}
 			disabled={loadingTables || !accountId || !apiKey}
 			class="rounded bg-gray-600 px-4 py-2 font-medium text-white hover:bg-gray-700 disabled:opacity-50"
 		>
@@ -342,7 +343,7 @@
 			<div class="flex flex-wrap gap-2">
 				{#each tables as table}
 					<button
-						on:click={() => selectTable(table)}
+						onclick={() => selectTable(table)}
 						class="rounded bg-blue-100 px-3 py-1 text-sm text-blue-800 hover:bg-blue-200"
 					>
 						{table}
@@ -368,14 +369,14 @@
 			<label for="sqlEditor" class="block text-sm font-medium">SQL Query</label>
 			<div class="flex space-x-2">
 				<button
-					on:click={() => loadQuery("SELECT 'Hello Cloudflare Analytics Engine' AS message")}
+					onclick={() => loadQuery("SELECT 'Hello Cloudflare Analytics Engine' AS message")}
 					class="rounded bg-gray-200 px-2 py-1 text-sm hover:bg-gray-300"
 					title="Run a simple test query"
 				>
 					Sample Query
 				</button>
 				<button
-					on:click={() => (showSaveDialog = true)}
+					onclick={() => (showSaveDialog = true)}
 					class="rounded bg-gray-200 px-2 py-1 text-sm hover:bg-gray-300"
 				>
 					Save Query
@@ -385,7 +386,7 @@
 						<button
 							type="button"
 							class="inline-flex items-center rounded bg-gray-200 px-2 py-1 text-sm hover:bg-gray-300"
-							on:click={toggleDropdown}
+							onclick={toggleDropdown}
 						>
 							Load Query
 							<svg
@@ -415,7 +416,7 @@
 									>
 										<button
 											class="flex-grow text-left"
-											on:click={() => {
+											onclick={() => {
 												loadQuery(query.query);
 												hideDropdown();
 											}}
@@ -424,7 +425,7 @@
 										</button>
 										<button
 											class="text-red-500 hover:text-red-700"
-											on:click={() => {
+											onclick={() => {
 												deleteQuery(i);
 												hideDropdown();
 											}}
@@ -458,7 +459,7 @@
 
 	<div class="mb-6">
 		<button
-			on:click={executeQuery}
+			onclick={executeQuery}
 			disabled={loading}
 			class="rounded bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700 disabled:opacity-50"
 		>
@@ -497,13 +498,13 @@
 			</div>
 			<div class="flex justify-end space-x-2">
 				<button
-					on:click={() => (showSaveDialog = false)}
+					onclick={() => (showSaveDialog = false)}
 					class="rounded border px-4 py-2 hover:bg-gray-100"
 				>
 					Cancel
 				</button>
 				<button
-					on:click={saveQuery}
+					onclick={saveQuery}
 					class="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
 				>
 					Save
