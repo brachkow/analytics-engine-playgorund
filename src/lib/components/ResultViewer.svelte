@@ -12,6 +12,9 @@
 
 	let resultEditorElement: HTMLElement;
 	let resultEditorView: EditorView;
+	let viewMode = $state('table'); // 'table' or 'raw'
+	let parsedResult = $state<any>(null);
+	let parseError = $state<string | null>(null);
 
 	onMount(() => {
 		// Initialize Result CodeMirror (readonly)
@@ -32,6 +35,22 @@
 		}
 	});
 
+	// Parse the result when it changes
+	$effect(() => {
+		if (result) {
+			try {
+				parsedResult = typeof result === 'string' ? JSON.parse(result) : result;
+				parseError = null;
+			} catch (e) {
+				console.error('Error parsing result:', e);
+				parsedResult = null;
+				parseError = 'Failed to parse result as JSON';
+			}
+		} else {
+			parsedResult = null;
+		}
+	});
+
 	// Update result editor when result changes
 	$effect(() => {
 		if (resultEditorView && result) {
@@ -40,14 +59,168 @@
 			});
 		}
 	});
+
+	function toggleViewMode() {
+		viewMode = viewMode === 'table' ? 'raw' : 'table';
+	}
+
+	// Helper function to determine if a value is a number
+	function isNumber(value: any): boolean {
+		return typeof value === 'number' || (typeof value === 'string' && !isNaN(Number(value)));
+	}
+
+	// Helper function to format cell values
+	function formatCellValue(value: any): string {
+		if (value === null || value === undefined) {
+			return '';
+		} else if (typeof value === 'object') {
+			return JSON.stringify(value);
+		}
+		return String(value);
+	}
 </script>
 
-<div class="flex h-[300px] w-full flex-col md:h-auto md:w-1/2">
+<div class="flex w-full flex-col">
 	<div class="mb-2 flex items-center justify-between">
 		<h2 class="text-xl font-semibold">Result:</h2>
-		{#if loading}
-			<div class="text-sm text-gray-600">Executing query...</div>
+		<div class="flex items-center gap-2">
+			{#if loading}
+				<div class="text-sm text-gray-600">Executing query...</div>
+			{/if}
+			{#if result}
+				<button
+					on:click={toggleViewMode}
+					class="rounded bg-gray-200 px-2 py-1 text-sm hover:bg-gray-300"
+				>
+					{viewMode === 'table' ? 'View Raw' : 'View Table'}
+				</button>
+			{/if}
+		</div>
+	</div>
+
+	<div class="h-[400px] rounded border">
+		{#if viewMode === 'table' && parsedResult}
+			<div class="h-full overflow-auto p-2">
+				{#if parseError}
+					<div class="text-red-500">{parseError}</div>
+				{:else if parsedResult.meta && parsedResult.data}
+					<!-- Table view for structured data -->
+					<div class="overflow-x-auto">
+						<table class="w-full border-collapse text-sm">
+							<thead>
+								<tr class="bg-gray-100">
+									{#each parsedResult.meta as column}
+										<th class="border border-gray-300 p-2 text-left">{column.name}</th>
+									{/each}
+								</tr>
+							</thead>
+							<tbody>
+								{#each parsedResult.data as row}
+									<tr class="hover:bg-gray-50">
+										{#each parsedResult.meta as column}
+											<td
+												class="border border-gray-300 p-2 {isNumber(row[column.name])
+													? 'text-right'
+													: 'text-left'} {column.type === 'DateTime' ? 'whitespace-nowrap' : ''}"
+											>
+												{formatCellValue(row[column.name])}
+											</td>
+										{/each}
+									</tr>
+								{/each}
+							</tbody>
+						</table>
+						{#if parsedResult.rows !== undefined}
+							<div class="mt-2 text-sm text-gray-600">
+								Showing {parsedResult.rows} row{parsedResult.rows !== 1 ? 's' : ''}
+								{#if parsedResult.rows_before_limit_at_least > parsedResult.rows}
+									of at least {parsedResult.rows_before_limit_at_least}
+								{/if}
+							</div>
+						{/if}
+					</div>
+				{:else}
+					<!-- Generic table view for other JSON structures -->
+					<div class="overflow-x-auto">
+						<table class="w-full border-collapse text-sm">
+							{#if Array.isArray(parsedResult)}
+								<!-- Array of objects -->
+								{#if parsedResult.length > 0 && typeof parsedResult[0] === 'object'}
+									<thead>
+										<tr class="bg-gray-100">
+											{#each Object.keys(parsedResult[0]) as key}
+												<th class="border border-gray-300 p-2 text-left">{key}</th>
+											{/each}
+										</tr>
+									</thead>
+									<tbody>
+										{#each parsedResult as item}
+											<tr class="hover:bg-gray-50">
+												{#each Object.keys(parsedResult[0]) as key}
+													<td
+														class="border border-gray-300 p-2 {isNumber(item[key])
+															? 'text-right'
+															: 'text-left'}"
+													>
+														{formatCellValue(item[key])}
+													</td>
+												{/each}
+											</tr>
+										{/each}
+									</tbody>
+								{:else}
+									<!-- Simple array -->
+									<thead>
+										<tr class="bg-gray-100">
+											<th class="border border-gray-300 p-2 text-left">Index</th>
+											<th class="border border-gray-300 p-2 text-left">Value</th>
+										</tr>
+									</thead>
+									<tbody>
+										{#each parsedResult as item, index}
+											<tr class="hover:bg-gray-50">
+												<td class="border border-gray-300 p-2 text-right">{index}</td>
+												<td class="border border-gray-300 p-2">{formatCellValue(item)}</td>
+											</tr>
+										{/each}
+									</tbody>
+								{/if}
+							{:else if typeof parsedResult === 'object'}
+								<!-- Simple object -->
+								<thead>
+									<tr class="bg-gray-100">
+										<th class="border border-gray-300 p-2 text-left">Key</th>
+										<th class="border border-gray-300 p-2 text-left">Value</th>
+									</tr>
+								</thead>
+								<tbody>
+									{#each Object.entries(parsedResult) as [key, value]}
+										<tr class="hover:bg-gray-50">
+											<td class="border border-gray-300 p-2">{key}</td>
+											<td class="border border-gray-300 p-2">{formatCellValue(value)}</td>
+										</tr>
+									{/each}
+								</tbody>
+							{:else}
+								<div class="p-4">
+									{formatCellValue(parsedResult)}
+								</div>
+							{/if}
+						</table>
+					</div>
+				{/if}
+			</div>
+		{:else}
+			<div id="resultEditor" bind:this={resultEditorElement} class="h-full"></div>
 		{/if}
 	</div>
-	<div id="resultEditor" bind:this={resultEditorElement} class="flex-grow rounded border"></div>
 </div>
+
+<style>
+	/* Make sure table headers stay fixed when scrolling horizontally */
+	thead {
+		position: sticky;
+		top: 0;
+		z-index: 1;
+	}
+</style>

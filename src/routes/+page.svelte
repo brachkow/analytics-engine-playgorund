@@ -200,30 +200,32 @@
 	}
 </script>
 
-<div class="container mx-auto max-w-full p-4">
+<div class="container mx-auto max-w-6xl p-4">
 	<Header />
 
-	<!-- Two-pane layout -->
-	<div class="flex flex-col gap-6 md:h-[calc(100vh-220px)] md:flex-row">
-		<!-- Left pane: Controls and SQL editor -->
-		<div class="flex w-full flex-col md:w-1/2">
-			<CredentialsInput
-				{accountId}
-				{apiKey}
-				onAccountIdChange={handleAccountIdChange}
-				onApiKeyChange={handleApiKeyChange}
-			/>
+	<!-- Single column layout -->
+	<div class="flex flex-col gap-6">
+		<!-- Credentials section -->
+		<CredentialsInput
+			{accountId}
+			{apiKey}
+			onAccountIdChange={handleAccountIdChange}
+			onApiKeyChange={handleApiKeyChange}
+		/>
 
-			<TableList
-				{tables}
-				{loadingTables}
-				{error}
-				{selectTable}
-				{fetchTables}
-				hasCredentials={!!accountId && !!apiKey}
-				{lastSelectedTable}
-			/>
+		<!-- Tables section -->
+		<TableList
+			{tables}
+			{loadingTables}
+			{error}
+			{selectTable}
+			{fetchTables}
+			hasCredentials={!!accountId && !!apiKey}
+			{lastSelectedTable}
+		/>
 
+		<!-- SQL Editor section -->
+		<div class="relative">
 			<SqlEditor
 				{sqlQuery}
 				onSqlQueryChange={handleSqlQueryChange}
@@ -236,18 +238,16 @@
 				{error}
 			/>
 
-			<div class="relative">
-				<SavedQueriesDropdown
-					{savedQueries}
-					{loadQuery}
-					{deleteQuery}
-					isVisible={savedQueriesVisible}
-					onVisibilityChange={handleDropdownVisibilityChange}
-				/>
-			</div>
+			<SavedQueriesDropdown
+				{savedQueries}
+				{loadQuery}
+				{deleteQuery}
+				isVisible={savedQueriesVisible}
+				onVisibilityChange={handleDropdownVisibilityChange}
+			/>
 		</div>
 
-		<!-- Right pane: Results -->
+		<!-- Results section -->
 		<ResultViewer {result} {loading} />
 	</div>
 

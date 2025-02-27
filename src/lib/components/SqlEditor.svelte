@@ -66,7 +66,7 @@
 </script>
 
 <div class="flex flex-col">
-	<div class="mb-4 h-64 w-full overflow-hidden rounded border" bind:this={editorContainer}></div>
+	<div class="mb-4 h-48 w-full overflow-hidden rounded border" bind:this={editorContainer}></div>
 
 	{#if props.error}
 		<div class="mb-2 rounded bg-red-100 p-2 text-red-700">
