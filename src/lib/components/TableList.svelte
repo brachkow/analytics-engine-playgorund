@@ -5,7 +5,8 @@
 		error = '',
 		selectTable,
 		fetchTables,
-		hasCredentials = false
+		hasCredentials = false,
+		lastSelectedTable = ''
 	} = $props<{
 		tables?: string[];
 		loadingTables?: boolean;
@@ -13,6 +14,7 @@
 		selectTable: (tableName: string) => void;
 		fetchTables: () => void;
 		hasCredentials?: boolean;
+		lastSelectedTable?: string;
 	}>();
 </script>
 
@@ -23,7 +25,11 @@
 			{#each tables as table}
 				<button
 					onclick={() => selectTable(table)}
-					class="rounded bg-blue-100 px-3 py-1 text-sm text-blue-800 hover:bg-blue-200"
+					class={`rounded px-3 py-1 text-sm ${
+						lastSelectedTable === table
+							? 'bg-blue-500 text-white'
+							: 'bg-blue-100 text-blue-800 hover:bg-blue-200'
+					}`}
 				>
 					{table}
 				</button>

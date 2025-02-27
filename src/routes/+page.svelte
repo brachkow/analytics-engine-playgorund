@@ -24,6 +24,7 @@
 	let tables: string[] = $state([]);
 	let loadingTables = $state(false);
 	let credentialsComplete = $state(false);
+	let lastSelectedTable = $state('');
 
 	// SQL Editor reference
 	let sqlEditorApi = $state<{ updateEditor: (query: string) => void } | null>(null);
@@ -47,6 +48,9 @@
 
 		// Load saved queries from localStorage
 		savedQueries = analyticsService.loadSavedQueries();
+
+		// Load last selected table from localStorage
+		lastSelectedTable = analyticsService.loadLastSelectedTable();
 	});
 
 	// Functions for handling saved queries
@@ -134,6 +138,11 @@
 					Array.isArray(queryResult.result.data)
 				) {
 					tables = queryResult.result.data.map((item: any) => item.dataset).filter(Boolean);
+
+					// If we have a last selected table and it exists in the tables list, select it
+					if (lastSelectedTable && tables.includes(lastSelectedTable)) {
+						selectTable(lastSelectedTable);
+					}
 				}
 
 				if (tables.length === 0) {
@@ -151,6 +160,10 @@
 	function selectTable(tableName: string) {
 		const query = `SELECT * FROM '${tableName}' LIMIT 10`;
 		loadQuery(query);
+
+		// Save the selected table
+		lastSelectedTable = tableName;
+		analyticsService.saveLastSelectedTable(tableName);
 	}
 
 	// Functions for dropdown handling
@@ -208,6 +221,7 @@
 				{selectTable}
 				{fetchTables}
 				hasCredentials={!!accountId && !!apiKey}
+				{lastSelectedTable}
 			/>
 
 			<SqlEditor

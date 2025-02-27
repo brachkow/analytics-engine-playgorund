@@ -124,3 +124,17 @@ export function loadSavedQueries(): { name: string; query: string }[] {
 	}
 	return [];
 }
+
+/**
+ * Save the last selected table to localStorage
+ */
+export function saveLastSelectedTable(tableName: string): void {
+	localStorage.setItem('cf_last_selected_table', tableName);
+}
+
+/**
+ * Load the last selected table from localStorage
+ */
+export function loadLastSelectedTable(): string {
+	return localStorage.getItem('cf_last_selected_table') || '';
+}
