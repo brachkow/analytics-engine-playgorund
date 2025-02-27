@@ -20,7 +20,7 @@
 			<span class="ml-1">GitHub</span>
 		</a>
 		<a
-			href="https://developers.cloudflare.com/analytics/analytics-engine/sql-api/"
+			href="https://developers.cloudflare.com/analytics/analytics-engine/sql-reference/"
 			target="_blank"
 			rel="noopener noreferrer"
 			class="flex items-center text-blue-600 hover:text-blue-800"
