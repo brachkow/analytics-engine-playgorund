@@ -6,7 +6,6 @@
 	import SqlEditor from '$lib/components/SqlEditor.svelte';
 	import ResultViewer from '$lib/components/ResultViewer.svelte';
 	import SavedQueriesDropdown from '$lib/components/SavedQueriesDropdown.svelte';
-	import SaveQueryDialog from '$lib/components/SaveQueryDialog.svelte';
 	import Footer from '$lib/components/Footer.svelte';
 	import * as analyticsService from '$lib/services/analyticsService';
 
@@ -172,7 +171,15 @@
 	}
 
 	function setShowSaveDialog(show: boolean) {
-		showSaveDialog = show;
+		if (show) {
+			const promptedName = prompt('Enter a name for your query:', newQueryName);
+			if (promptedName !== null) {
+				newQueryName = promptedName;
+				saveQuery();
+			}
+		} else {
+			showSaveDialog = false;
+		}
 	}
 
 	function handleAccountIdChange(id: string) {
@@ -185,10 +192,6 @@
 
 	function handleSqlQueryChange(query: string) {
 		sqlQuery = query;
-	}
-
-	function handleQueryNameChange(name: string) {
-		newQueryName = name;
 	}
 
 	function handleDropdownVisibilityChange(visible: boolean) {
@@ -253,14 +256,6 @@
 
 	<Footer />
 </div>
-
-<SaveQueryDialog
-	{showSaveDialog}
-	{newQueryName}
-	onQueryNameChange={handleQueryNameChange}
-	{saveQuery}
-	closeDialog={() => setShowSaveDialog(false)}
-/>
 
 <style>
 	/* CodeMirror styling */
