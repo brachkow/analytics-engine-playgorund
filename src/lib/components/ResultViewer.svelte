@@ -4,6 +4,8 @@
 	import { json } from '@codemirror/lang-json';
 	import { oneDark } from '@codemirror/theme-one-dark';
 	import { EditorState } from '@codemirror/state';
+	import { keymap } from '@codemirror/view';
+	import { indentWithTab } from '@codemirror/commands';
 
 	const { result = '', loading = false } = $props<{
 		result?: string;
@@ -39,7 +41,13 @@
 			if (resultEditorElement) {
 				resultEditorView = new EditorView({
 					doc: result || '// Results will appear here after executing a query',
-					extensions: [basicSetup, json(), oneDark, EditorState.readOnly.of(true)],
+					extensions: [
+						basicSetup,
+						json(),
+						oneDark,
+						keymap.of([indentWithTab]),
+						EditorState.readOnly.of(true)
+					],
 					parent: resultEditorElement
 				});
 			}
@@ -112,7 +120,7 @@
 			{/if}
 			{#if result}
 				<button
-					on:click={toggleViewMode}
+					onclick={toggleViewMode}
 					class="rounded bg-gray-200 px-2 py-1 text-sm hover:bg-gray-300"
 				>
 					{viewMode === 'table' ? 'View Raw' : 'View Table'}

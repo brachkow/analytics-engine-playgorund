@@ -4,6 +4,8 @@
 	import { sql } from '@codemirror/lang-sql';
 	import { EditorState } from '@codemirror/state';
 	import { oneDark } from '@codemirror/theme-one-dark';
+	import { keymap } from '@codemirror/view';
+	import { indentWithTab } from '@codemirror/commands';
 
 	const props = $props<{
 		sqlQuery: string;
@@ -42,6 +44,7 @@
 				basicSetup,
 				sql(),
 				oneDark,
+				keymap.of([indentWithTab]),
 				EditorView.updateListener.of((update) => {
 					if (update.docChanged) {
 						const newQuery = update.state.doc.toString();

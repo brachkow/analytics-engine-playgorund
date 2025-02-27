@@ -42,10 +42,12 @@
 		]
 	},
 	"dependencies": {
+		"@codemirror/commands": "^6.8.0",
 		"@codemirror/lang-json": "^6.0.1",
 		"@codemirror/lang-sql": "^6.8.0",
 		"@codemirror/state": "^6.5.2",
 		"@codemirror/theme-one-dark": "^6.1.2",
+		"@codemirror/view": "^6.36.3",
 		"codemirror": "^6.0.1"
 	}
 }
