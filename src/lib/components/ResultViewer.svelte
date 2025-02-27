@@ -18,15 +18,7 @@
 
 	onMount(() => {
 		// Initialize Result CodeMirror (readonly)
-		try {
-			resultEditorView = new EditorView({
-				doc: result || '// Results will appear here after executing a query',
-				extensions: [basicSetup, json(), oneDark, EditorState.readOnly.of(true)],
-				parent: resultEditorElement
-			});
-		} catch (e) {
-			console.error('Error initializing result editor:', e);
-		}
+		initializeEditor();
 	});
 
 	onDestroy(() => {
@@ -34,6 +26,27 @@
 			resultEditorView.destroy();
 		}
 	});
+
+	// Initialize or reinitialize the editor
+	function initializeEditor() {
+		try {
+			// Destroy existing editor if it exists
+			if (resultEditorView) {
+				resultEditorView.destroy();
+			}
+
+			// Only initialize if the element exists
+			if (resultEditorElement) {
+				resultEditorView = new EditorView({
+					doc: result || '// Results will appear here after executing a query',
+					extensions: [basicSetup, json(), oneDark, EditorState.readOnly.of(true)],
+					parent: resultEditorElement
+				});
+			}
+		} catch (e) {
+			console.error('Error initializing result editor:', e);
+		}
+	}
 
 	// Parse the result when it changes
 	$effect(() => {
@@ -51,12 +64,22 @@
 		}
 	});
 
-	// Update result editor when result changes
+	// Update result editor when result changes or view mode changes
 	$effect(() => {
 		if (resultEditorView && result) {
 			resultEditorView.dispatch({
 				changes: { from: 0, to: resultEditorView.state.doc.length, insert: result }
 			});
+		}
+	});
+
+	// Reinitialize editor when view mode changes to raw
+	$effect(() => {
+		if (viewMode === 'raw' && result) {
+			// Use setTimeout to ensure the DOM is updated before initializing
+			setTimeout(() => {
+				initializeEditor();
+			}, 0);
 		}
 	});
 
@@ -99,7 +122,11 @@
 	</div>
 
 	<div class="h-[400px] rounded border">
-		{#if viewMode === 'table' && parsedResult}
+		{#if !result}
+			<div class="flex h-full items-center justify-center text-gray-500">
+				Execute a query to see results
+			</div>
+		{:else if viewMode === 'table' && parsedResult}
 			<div class="h-full overflow-auto p-2">
 				{#if parseError}
 					<div class="text-red-500">{parseError}</div>
