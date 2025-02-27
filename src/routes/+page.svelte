@@ -7,6 +7,7 @@
 	import ResultViewer from '$lib/components/ResultViewer.svelte';
 	import SavedQueriesDropdown from '$lib/components/SavedQueriesDropdown.svelte';
 	import SaveQueryDialog from '$lib/components/SaveQueryDialog.svelte';
+	import Footer from '$lib/components/Footer.svelte';
 	import * as analyticsService from '$lib/services/analyticsService';
 
 	// State variables
@@ -235,6 +236,8 @@
 		<!-- Right pane: Results -->
 		<ResultViewer {result} {loading} />
 	</div>
+
+	<Footer />
 </div>
 
 <SaveQueryDialog
