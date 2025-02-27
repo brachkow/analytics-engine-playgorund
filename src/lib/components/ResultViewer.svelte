@@ -121,126 +121,124 @@
 		</div>
 	</div>
 
-	<div class="h-[400px] rounded border">
-		{#if !result}
-			<div class="flex h-full items-center justify-center text-gray-500">
-				Execute a query to see results
-			</div>
-		{:else if viewMode === 'table' && parsedResult}
-			<div class="h-full overflow-auto p-2">
-				{#if parseError}
-					<div class="text-red-500">{parseError}</div>
-				{:else if parsedResult.meta && parsedResult.data}
-					<!-- Table view for structured data -->
-					<div class="overflow-x-auto">
-						<table class="w-full border-collapse text-sm">
-							<thead>
-								<tr class="bg-gray-100">
+	{#if !result}
+		<div class="flex h-full items-center justify-center text-gray-500">
+			Execute a query to see results
+		</div>
+	{:else if viewMode === 'table' && parsedResult}
+		<div class="h-full overflow-auto p-2">
+			{#if parseError}
+				<div class="text-red-500">{parseError}</div>
+			{:else if parsedResult.meta && parsedResult.data}
+				<!-- Table view for structured data -->
+				<div class="overflow-x-auto">
+					<table class="w-full border-collapse text-sm">
+						<thead>
+							<tr class="bg-gray-100">
+								{#each parsedResult.meta as column}
+									<th class="border border-gray-300 p-2 text-left">{column.name}</th>
+								{/each}
+							</tr>
+						</thead>
+						<tbody>
+							{#each parsedResult.data as row}
+								<tr class="hover:bg-gray-50">
 									{#each parsedResult.meta as column}
-										<th class="border border-gray-300 p-2 text-left">{column.name}</th>
+										<td
+											class="border border-gray-300 p-2 {isNumber(row[column.name])
+												? 'text-right'
+												: 'text-left'} {column.type === 'DateTime' ? 'whitespace-nowrap' : ''}"
+										>
+											{formatCellValue(row[column.name])}
+										</td>
 									{/each}
 								</tr>
-							</thead>
-							<tbody>
-								{#each parsedResult.data as row}
-									<tr class="hover:bg-gray-50">
-										{#each parsedResult.meta as column}
-											<td
-												class="border border-gray-300 p-2 {isNumber(row[column.name])
-													? 'text-right'
-													: 'text-left'} {column.type === 'DateTime' ? 'whitespace-nowrap' : ''}"
-											>
-												{formatCellValue(row[column.name])}
-											</td>
-										{/each}
-									</tr>
-								{/each}
-							</tbody>
-						</table>
-						{#if parsedResult.rows !== undefined}
-							<div class="mt-2 text-sm text-gray-600">
-								Showing {parsedResult.rows} row{parsedResult.rows !== 1 ? 's' : ''}
-								{#if parsedResult.rows_before_limit_at_least > parsedResult.rows}
-									of at least {parsedResult.rows_before_limit_at_least}
-								{/if}
-							</div>
-						{/if}
-					</div>
-				{:else}
-					<!-- Generic table view for other JSON structures -->
-					<div class="overflow-x-auto">
-						<table class="w-full border-collapse text-sm">
-							{#if Array.isArray(parsedResult)}
-								<!-- Array of objects -->
-								{#if parsedResult.length > 0 && typeof parsedResult[0] === 'object'}
-									<thead>
-										<tr class="bg-gray-100">
-											{#each Object.keys(parsedResult[0]) as key}
-												<th class="border border-gray-300 p-2 text-left">{key}</th>
-											{/each}
-										</tr>
-									</thead>
-									<tbody>
-										{#each parsedResult as item}
-											<tr class="hover:bg-gray-50">
-												{#each Object.keys(parsedResult[0]) as key}
-													<td
-														class="border border-gray-300 p-2 {isNumber(item[key])
-															? 'text-right'
-															: 'text-left'}"
-													>
-														{formatCellValue(item[key])}
-													</td>
-												{/each}
-											</tr>
-										{/each}
-									</tbody>
-								{:else}
-									<!-- Simple array -->
-									<thead>
-										<tr class="bg-gray-100">
-											<th class="border border-gray-300 p-2 text-left">Index</th>
-											<th class="border border-gray-300 p-2 text-left">Value</th>
-										</tr>
-									</thead>
-									<tbody>
-										{#each parsedResult as item, index}
-											<tr class="hover:bg-gray-50">
-												<td class="border border-gray-300 p-2 text-right">{index}</td>
-												<td class="border border-gray-300 p-2">{formatCellValue(item)}</td>
-											</tr>
-										{/each}
-									</tbody>
-								{/if}
-							{:else if typeof parsedResult === 'object'}
-								<!-- Simple object -->
+							{/each}
+						</tbody>
+					</table>
+					{#if parsedResult.rows !== undefined}
+						<div class="mt-2 text-sm text-gray-600">
+							Showing {parsedResult.rows} row{parsedResult.rows !== 1 ? 's' : ''}
+							{#if parsedResult.rows_before_limit_at_least > parsedResult.rows}
+								of at least {parsedResult.rows_before_limit_at_least}
+							{/if}
+						</div>
+					{/if}
+				</div>
+			{:else}
+				<!-- Generic table view for other JSON structures -->
+				<div class="overflow-x-auto">
+					<table class="w-full border-collapse text-sm">
+						{#if Array.isArray(parsedResult)}
+							<!-- Array of objects -->
+							{#if parsedResult.length > 0 && typeof parsedResult[0] === 'object'}
 								<thead>
 									<tr class="bg-gray-100">
-										<th class="border border-gray-300 p-2 text-left">Key</th>
-										<th class="border border-gray-300 p-2 text-left">Value</th>
+										{#each Object.keys(parsedResult[0]) as key}
+											<th class="border border-gray-300 p-2 text-left">{key}</th>
+										{/each}
 									</tr>
 								</thead>
 								<tbody>
-									{#each Object.entries(parsedResult) as [key, value]}
+									{#each parsedResult as item}
 										<tr class="hover:bg-gray-50">
-											<td class="border border-gray-300 p-2">{key}</td>
-											<td class="border border-gray-300 p-2">{formatCellValue(value)}</td>
+											{#each Object.keys(parsedResult[0]) as key}
+												<td
+													class="border border-gray-300 p-2 {isNumber(item[key])
+														? 'text-right'
+														: 'text-left'}"
+												>
+													{formatCellValue(item[key])}
+												</td>
+											{/each}
 										</tr>
 									{/each}
 								</tbody>
 							{:else}
-								<div class="p-4">
-									{formatCellValue(parsedResult)}
-								</div>
+								<!-- Simple array -->
+								<thead>
+									<tr class="bg-gray-100">
+										<th class="border border-gray-300 p-2 text-left">Index</th>
+										<th class="border border-gray-300 p-2 text-left">Value</th>
+									</tr>
+								</thead>
+								<tbody>
+									{#each parsedResult as item, index}
+										<tr class="hover:bg-gray-50">
+											<td class="border border-gray-300 p-2 text-right">{index}</td>
+											<td class="border border-gray-300 p-2">{formatCellValue(item)}</td>
+										</tr>
+									{/each}
+								</tbody>
 							{/if}
-						</table>
-					</div>
-				{/if}
-			</div>
-		{:else}
-			<div id="resultEditor" bind:this={resultEditorElement} class="h-full"></div>
-		{/if}
-	</div>
+						{:else if typeof parsedResult === 'object'}
+							<!-- Simple object -->
+							<thead>
+								<tr class="bg-gray-100">
+									<th class="border border-gray-300 p-2 text-left">Key</th>
+									<th class="border border-gray-300 p-2 text-left">Value</th>
+								</tr>
+							</thead>
+							<tbody>
+								{#each Object.entries(parsedResult) as [key, value]}
+									<tr class="hover:bg-gray-50">
+										<td class="border border-gray-300 p-2">{key}</td>
+										<td class="border border-gray-300 p-2">{formatCellValue(value)}</td>
+									</tr>
+								{/each}
+							</tbody>
+						{:else}
+							<div class="p-4">
+								{formatCellValue(parsedResult)}
+							</div>
+						{/if}
+					</table>
+				</div>
+			{/if}
+		</div>
+	{:else}
+		<div id="resultEditor" bind:this={resultEditorElement} class="h-full"></div>
+	{/if}
 </div>
 
 <style>
